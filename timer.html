@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #f0ede6;
+    --bg-warm:   #ede9df;
+    --card:      #faf9f6;
+    --card-dark: #1e1e1e;
+    --yellow:    #f0c93a;
+    --yellow-soft: #faf0bc;
+    --yellow-dim:  rgba(240,201,58,0.18);
+    --text:      #1a1a1a;
+    --text-mid:  #6b6860;
+    --text-light:#a8a49c;
+    --outline:   rgba(0,0,0,0.07);
+    --radius:    22px;
+    --radius-sm: 14px;
+    --radius-pill: 100px;
+    --shadow:    0 2px 0px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.07);
+    --shadow-sm: 0 2px 12px rgba(0,0,0,0.05);
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --dur: 0.6s;
+  }
+
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    font-family: 'Manrope', sans-serif;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+    gap: 16px;
+    transition: background var(--dur) var(--ease);
+  }
+
+  /* Background gradient blob — mimics the yellow wash in the reference */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -10%;
+    right: -10%;
+    width: 55vw;
+    height: 55vw;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(240,201,58,0.22) 0%, transparent 70%);
+    pointer-events: none;
+    transition: opacity var(--dur) var(--ease);
+    z-index: 0;
+  }
+
+  body > * { position: relative; z-index: 1; }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    border: 1.5px solid rgba(0,0,0,0.15);
+    padding: 6px 16px;
+    border-radius: var(--radius-pill);
+    letter-spacing: -0.2px;
+  }
+
+  .phase-pill {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 18px;
+    border-radius: var(--radius-pill);
+    background: var(--text);
+    color: #fff;
+    letter-spacing: 0.2px;
+    transition: background var(--dur) var(--ease);
+  }
+  body.phase1 .phase-pill { background: #1e1e1e; }
+  body.phase2 .phase-pill { background: var(--yellow); color: var(--text); }
+
+  /* ── MAIN TIMER CARD ── */
+  .timer-card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 36px 36px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+    overflow: hidden;
+    transition: background var(--dur) var(--ease);
+  }
+
+  /* Yellow wash that fills in phase 2 */
+  .timer-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--yellow-soft) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease);
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  body.phase2 .timer-card::after { opacity: 1; }
+
+  .card-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* The big clock */
+  .timer-display {
+    font-size: clamp(80px, 22vw, 128px);
+    font-weight: 300;
+    letter-spacing: -5px;
+    line-height: 1;
+    color: var(--text);
+    position: relative;
+    z-index: 1;
+    transition: color var(--dur) var(--ease);
+  }
+
+  .timer-display.bump {
+    animation: bump 0.45s var(--spring);
+  }
+  @keyframes bump {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  .timer-unit-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-mid);
+    margin-top: 4px;
+    position: relative;
+    z-index: 1;
+    transition: color var(--dur) var(--ease);
+  }
+
+  /* Progress bar row */
+  .progress-section {
+    margin-top: 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .progress-phase-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--yellow);
+    color: var(--text);
+    letter-spacing: 0.3px;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.3s, transform 0.3s var(--spring), background var(--dur) var(--ease);
+  }
+  body.phase1 .progress-phase-tag,
+  body.phase2 .progress-phase-tag {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  body.phase2 .progress-phase-tag {
+    background: var(--text);
+    color: #fff;
+  }
+
+  .progress-countdown {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .progress-track {
+    height: 6px;
+    background: rgba(0,0,0,0.08);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    width: 0%;
+    background: var(--text);
+    transition: width 1s linear, background var(--dur) var(--ease);
+  }
+  body.phase1 .progress-fill { background: var(--text); }
+  body.phase2 .progress-fill { background: var(--yellow); }
+
+  /* ── TWO SETTINGS CARDS SIDE BY SIDE ── */
+  .cards-row {
+    width: 100%;
+    max-width: 560px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .setting-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 20px 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: background var(--dur) var(--ease);
+  }
+
+  /* Phase I card gets a dark treatment when active */
+  body.phase1 .setting-card:first-child {
+    background: var(--card-dark);
+  }
+  body.phase2 .setting-card:last-child {
+    background: var(--card-dark);
+  }
+
+  .sc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sc-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: var(--text-mid);
+    text-transform: uppercase;
+    transition: color var(--dur) var(--ease);
+  }
+  body.phase1 .setting-card:first-child .sc-title,
+  body.phase2 .setting-card:last-child .sc-title {
+    color: rgba(255,255,255,0.5);
+  }
+
+  .sc-badge {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--outline);
+    transition: background var(--dur) var(--ease);
+  }
+  body.phase1 .setting-card:first-child .sc-badge {
+    background: var(--yellow);
+  }
+  body.phase2 .setting-card:last-child .sc-badge {
+    background: var(--yellow);
+  }
+
+  .sc-value {
+    font-size: 34px;
+    font-weight: 300;
+    letter-spacing: -1.5px;
+    color: var(--text);
+    line-height: 1;
+    transition: color var(--dur) var(--ease);
+  }
+  body.phase1 .setting-card:first-child .sc-value,
+  body.phase2 .setting-card:last-child .sc-value {
+    color: #fff;
+  }
+
+  /* MM:SS steppers inside setting card */
+  .sc-steppers {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .sc-unit {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .sc-unit-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    transition: color var(--dur) var(--ease);
+  }
+  body.phase1 .setting-card:first-child .sc-unit-label,
+  body.phase2 .setting-card:last-child .sc-unit-label {
+    color: rgba(255,255,255,0.35);
+  }
+
+  .sc-unit-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .sc-sep {
+    font-size: 20px;
+    font-weight: 300;
+    color: var(--text-light);
+    padding: 0 1px;
+    margin-top: 12px;
+    transition: color var(--dur) var(--ease);
+  }
+  body.phase1 .setting-card:first-child .sc-sep,
+  body.phase2 .setting-card:last-child .sc-sep {
+    color: rgba(255,255,255,0.3);
+  }
+
+  .sc-num {
+    font-size: 17px;
+    font-weight: 500;
+    min-width: 26px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    transition: color var(--dur) var(--ease);
+  }
+  body.phase1 .setting-card:first-child .sc-num,
+  body.phase2 .setting-card:last-child .sc-num {
+    color: #fff;
+  }
+
+  .adj-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(0,0,0,0.07);
+    color: var(--text);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 400;
+    font-family: 'Manrope', sans-serif;
+    transition: background 0.15s, transform 0.1s var(--spring), color var(--dur) var(--ease);
+    -webkit-tap-highlight-color: transparent;
+    line-height: 1;
+    user-select: none;
+  }
+  .adj-btn:hover { background: rgba(0,0,0,0.13); }
+  .adj-btn:active { transform: scale(0.87); }
+
+  body.phase1 .setting-card:first-child .adj-btn,
+  body.phase2 .setting-card:last-child .adj-btn {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+  }
+  body.phase1 .setting-card:first-child .adj-btn:hover,
+  body.phase2 .setting-card:last-child .adj-btn:hover {
+    background: rgba(255,255,255,0.18);
+  }
+
+  /* ── BOTTOM ACTION ROW ── */
+  .action-row {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    gap: 12px;
+  }
+
+  .btn-start {
+    flex: 1;
+    height: 54px;
+    border-radius: var(--radius-pill);
+    border: none;
+    background: var(--text);
+    color: #fff;
+    font-family: 'Manrope', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    letter-spacing: 0.1px;
+    transition: background var(--dur) var(--ease), transform 0.12s var(--spring), box-shadow 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-start:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.2); transform: translateY(-1px); }
+  .btn-start:active { transform: scale(0.97); }
+  body.phase2 .btn-start { background: var(--yellow); color: var(--text); }
+
+  .btn-reset {
+    width: 54px;
+    height: 54px;
+    border-radius: var(--radius-pill);
+    border: 1.5px solid rgba(0,0,0,0.12);
+    background: var(--card);
+    color: var(--text-mid);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s, transform 0.12s var(--spring);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-reset:hover { background: rgba(0,0,0,0.05); }
+  .btn-reset:active { transform: scale(0.93); }
+
+  /* ── PHASE DOTS ── */
+  .dots {
+    display: flex;
+    gap: 5px;
+    margin-top: 16px;
+    position: relative;
+    z-index: 1;
+  }
+  .dot {
+    height: 5px;
+    width: 5px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.15);
+    transition: width 0.4s var(--spring), background var(--dur) var(--ease);
+  }
+  .dot.active { width: 18px; background: var(--text); }
+  body.phase2 .dot.active { background: var(--yellow); }
+
+  /* Flash */
+  .flash {
+    position: fixed;
+    inset: 0;
+    background: var(--yellow-soft);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9999;
+  }
+  .flash.go { animation: flashFade 0.7s var(--ease) forwards; }
+  @keyframes flashFade { 0% { opacity: 0.55; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="logo">Timer</div>
+  <div class="phase-pill" id="phaseChip">Ready</div>
+</div>
+
+<!-- Main timer card -->
+<div class="timer-card">
+  <div class="card-label">Work Time</div>
+  <div class="timer-display" id="timerDisplay">00:00</div>
+  <div class="timer-unit-label" id="timerSub">Set your intervals below</div>
+
+  <div class="dots">
+    <div class="dot active" id="dot0"></div>
+    <div class="dot" id="dot1"></div>
+    <div class="dot" id="dot2"></div>
+  </div>
+
+  <div class="progress-section">
+    <div class="progress-meta">
+      <div class="progress-phase-tag" id="phaseTag">Phase I</div>
+      <div class="progress-countdown" id="progressCountdown">—</div>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Two interval setting cards -->
+<div class="cards-row">
+
+  <!-- Phase I -->
+  <div class="setting-card" id="cardX">
+    <div class="sc-header">
+      <div class="sc-title">Phase I — X</div>
+      <div class="sc-badge"></div>
+    </div>
+    <div class="sc-value" id="xDisplay">5:00</div>
+    <div class="sc-steppers">
+      <div class="sc-unit">
+        <div class="sc-unit-label">min</div>
+        <div class="sc-unit-row">
+          <button class="adj-btn" onclick="adjust('xm',-1)">−</button>
+          <span class="sc-num" id="xmVal">5</span>
+          <button class="adj-btn" onclick="adjust('xm', 1)">+</button>
+        </div>
+      </div>
+      <div class="sc-sep">:</div>
+      <div class="sc-unit">
+        <div class="sc-unit-label">sec</div>
+        <div class="sc-unit-row">
+          <button class="adj-btn" onclick="adjust('xs',-1)">−</button>
+          <span class="sc-num" id="xsVal">00</span>
+          <button class="adj-btn" onclick="adjust('xs', 1)">+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase II -->
+  <div class="setting-card" id="cardY">
+    <div class="sc-header">
+      <div class="sc-title">Phase II — Y</div>
+      <div class="sc-badge"></div>
+    </div>
+    <div class="sc-value" id="yDisplay">5:00</div>
+    <div class="sc-steppers">
+      <div class="sc-unit">
+        <div class="sc-unit-label">min</div>
+        <div class="sc-unit-row">
+          <button class="adj-btn" onclick="adjust('ym',-1)">−</button>
+          <span class="sc-num" id="ymVal">5</span>
+          <button class="adj-btn" onclick="adjust('ym', 1)">+</button>
+        </div>
+      </div>
+      <div class="sc-sep">:</div>
+      <div class="sc-unit">
+        <div class="sc-unit-label">sec</div>
+        <div class="sc-unit-row">
+          <button class="adj-btn" onclick="adjust('ys',-1)">−</button>
+          <span class="sc-num" id="ysVal">00</span>
+          <button class="adj-btn" onclick="adjust('ys', 1)">+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Actions -->
+<div class="action-row">
+  <button class="btn-start" id="startBtn" onclick="toggleTimer()">
+    <svg id="startIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    <span id="startLabel">Start</span>
+  </button>
+  <button class="btn-reset" onclick="resetTimer()" title="Reset">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+  </button>
+</div>
+
+<div class="flash" id="flash"></div>
+
+<script>
+  let Xm = 5, Xs = 0, Ym = 5, Ys = 0;
+  let elapsed = 0, running = false, interval = null, currentPhase = -1;
+
+  function xSec() { return Xm * 60 + Xs; }
+  function ySec() { return Ym * 60 + Ys; }
+
+  function fmt(s) {
+    return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function fmtShort(s) {
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m + ':' + String(sec).padStart(2,'0');
+  }
+
+  const PHASES = [
+    { body: '',       chip: 'Ready',    tag: '' },
+    { body: 'phase1', chip: 'Phase I',  tag: 'Phase I' },
+    { body: 'phase2', chip: 'Phase II', tag: 'Phase II' },
+  ];
+
+  function applyPhase(p, animate = true) {
+    if (currentPhase === p) return;
+    currentPhase = p;
+    if (animate) doFlash();
+    document.body.className = PHASES[p].body;
+    document.getElementById('phaseChip').textContent = PHASES[p].chip;
+    document.getElementById('phaseTag').textContent = PHASES[p].tag;
+    [0,1,2].forEach(i => document.getElementById('dot'+i).classList.toggle('active', i === p));
+  }
+
+  function doFlash() {
+    const f = document.getElementById('flash');
+    f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+  }
+
+  function updateDisplay() {
+    const x = xSec(), xy = x + ySec();
+    document.getElementById('timerDisplay').textContent = fmt(elapsed);
+
+    if (elapsed < x) {
+      applyPhase(1);
+      document.getElementById('progressFill').style.width = (elapsed / x * 100) + '%';
+      const rem = x - elapsed;
+      document.getElementById('progressCountdown').textContent = fmtShort(rem) + ' left';
+      document.getElementById('timerSub').textContent = fmtShort(rem) + ' until Phase II';
+    } else if (elapsed < xy) {
+      applyPhase(2);
+      document.getElementById('progressFill').style.width = ((elapsed - x) / ySec() * 100) + '%';
+      const rem = xy - elapsed;
+      document.getElementById('progressCountdown').textContent = fmtShort(rem) + ' left';
+      document.getElementById('timerSub').textContent = fmtShort(rem) + ' remaining';
+    } else {
+      applyPhase(2);
+      document.getElementById('progressFill').style.width = '100%';
+      document.getElementById('progressCountdown').textContent = 'Done';
+      document.getElementById('timerSub').textContent = 'Complete ✓';
+    }
+  }
+
+  function bumpTimer() {
+    const el = document.getElementById('timerDisplay');
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  }
+
+  function tick() {
+    elapsed++;
+    if (elapsed === xSec() || elapsed === xSec() + ySec()) bumpTimer();
+    updateDisplay();
+  }
+
+  function toggleTimer() {
+    if (!running) {
+      running = true;
+      if (currentPhase <= 0) applyPhase(1, false);
+      interval = setInterval(tick, 1000);
+      document.getElementById('startLabel').textContent = 'Pause';
+      document.getElementById('startIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+    } else {
+      running = false;
+      clearInterval(interval);
+      document.getElementById('startLabel').textContent = 'Resume';
+      document.getElementById('startIcon').innerHTML = '<path d="M8 5v14l11-7z"/>';
+    }
+  }
+
+  function resetTimer() {
+    running = false; clearInterval(interval); elapsed = 0; currentPhase = -1;
+    applyPhase(0, false);
+    document.getElementById('timerDisplay').textContent = '00:00';
+    document.getElementById('timerSub').textContent = 'Set your intervals below';
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressCountdown').textContent = '—';
+    document.getElementById('startLabel').textContent = 'Start';
+    document.getElementById('startIcon').innerHTML = '<path d="M8 5v14l11-7z"/>';
+  }
+
+  function refreshSettingDisplay() {
+    document.getElementById('xDisplay').textContent = fmtShort(xSec());
+    document.getElementById('yDisplay').textContent = fmtShort(ySec());
+  }
+
+  function adjust(which, delta) {
+    switch (which) {
+      case 'xm':
+        Xm = Math.max(0, Xm + delta);
+        if (Xm === 0 && Xs === 0) Xs = 30;
+        document.getElementById('xmVal').textContent = Xm;
+        break;
+      case 'xs':
+        Xs = Xs === 0 ? 30 : 0;
+        if (Xm === 0 && Xs === 0) Xs = 30;
+        document.getElementById('xsVal').textContent = String(Xs).padStart(2,'0');
+        break;
+      case 'ym':
+        Ym = Math.max(0, Ym + delta);
+        if (Ym === 0 && Ys === 0) Ys = 30;
+        document.getElementById('ymVal').textContent = Ym;
+        break;
+      case 'ys':
+        Ys = Ys === 0 ? 30 : 0;
+        if (Ym === 0 && Ys === 0) Ys = 30;
+        document.getElementById('ysVal').textContent = String(Ys).padStart(2,'0');
+        break;
+    }
+    refreshSettingDisplay();
+    if (!running && elapsed === 0) return;
+    updateDisplay();
+  }
+
+  applyPhase(0, false);
+  refreshSettingDisplay();
+</script>
+</body>
+</html>
